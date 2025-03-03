@@ -1,0 +1,717 @@
+#include<iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include<Windows.h>
+
+
+using namespace std;
+
+class Commit {
+public:
+    string timestamp;
+    string fileData;
+    Commit* next;
+
+    Commit(const string& data) : fileData(data), next(nullptr)
+    {
+
+    }
+};
+
+class File {
+public:
+    string name;
+    Commit* commits; // List of commits
+    File* next;
+
+    File(const string& n, const string& data) : name(n), next(nullptr)
+    {
+        commits = new Commit(data); // Initial commit when file is created
+    }
+
+    // Function to add a new version (commit) of the file
+    void commitFile(const string& data)
+    {
+        Commit* newCommit = new Commit(data);
+        newCommit->next = commits;
+        commits = newCommit;
+    }
+};
+
+class Comment {
+public:
+    string comment;
+    Comment* next;
+
+    Comment(const string& c) : comment(c), next(nullptr) {}
+};
+
+class Repository {
+public:
+    string name;
+    File* files;
+    Comment* comments;
+    bool visibility;
+    Repository* next;
+
+    Repository(const string& n) : name(n), files(nullptr), comments(nullptr), next(nullptr) {}
+
+    void addFile(const string& fileName, const string& fileData) {
+        File* newFile = new File(fileName, fileData);
+        if (files == nullptr)
+            files = newFile;
+        else {
+            File* temp = files;
+            while (temp->next != nullptr)
+                temp = temp->next;
+            temp->next = newFile;
+        }
+    }
+
+    void addComment(const string& commentText) {
+        Comment* newComment = new Comment(commentText);
+        if (comments == nullptr)
+            comments = newComment;
+        else {
+            Comment* temp = comments;
+            while (temp->next != nullptr)
+                temp = temp->next;
+            temp->next = newComment;
+        }
+    }
+
+    void displayVisibility() {
+        cout << "Visibility of repository '" << name << "': " << (visibility ? "Public" : "Private") << endl;
+    }
+
+    void setVisibility(bool visibility) {
+        this->visibility = visibility;
+    }
+
+    // Function to commit a file with new data
+    void commitFile(const string& fileName, const string& fileData) {
+        File* file = files;
+        while (file != nullptr) {
+            if (file->name == fileName) {
+                file->commitFile(fileData);
+                cout << "File '" << fileName << "' committed successfully!\n";
+                return;
+            }
+            file = file->next;
+        }
+        cout << "File '" << fileName << "' not found in repository.\n";
+    }
+};
+
+class User {
+public:
+    string username;
+    string password;
+    int followers;
+    User* next; // Pointer to the next user
+
+    // Pointer to the head of the linked list of users being followed
+    User* following;
+
+    // Pointer to the head of the linked list of repositories owned by the user
+    Repository* repositories;
+
+    User(const string& u, const string& p) : username(u), password(p), followers(0), next(nullptr), following(nullptr), repositories(nullptr) {}
+
+    void addRepository(const string& repoName, bool visibility) {
+        Repository* newRepo = new Repository(repoName);
+        newRepo->visibility = visibility;
+        if (repositories == nullptr)
+            repositories = newRepo;
+        else {
+            Repository* temp = repositories;
+            while (temp->next != nullptr)
+                temp = temp->next;
+            temp->next = newRepo;
+        }
+    }
+
+    Repository* findRepository(const string& repoName) {
+        Repository* temp = repositories;
+        while (temp != nullptr) {
+            if (temp->name == repoName)
+                return temp;
+            temp = temp->next;
+        }
+        return nullptr;
+    }
+
+    void followUser(User* userToFollow) {
+        if (following == nullptr) {
+            following = userToFollow;
+        }
+        else {
+            User* temp = following;
+            while (temp->next != nullptr) {
+                temp = temp->next;
+            }
+            temp->next = userToFollow;
+        }
+        userToFollow->followers++;
+    }
+
+    void unfollowUser(const string& usernameToUnfollow) {
+        if (following == nullptr) {
+            cout << "You are not following any users." << endl;
+            return;
+        }
+
+        if (following->username == usernameToUnfollow) {
+            User* temp = following;
+            following = following->next;
+            temp->next = nullptr;
+            temp->followers--;
+            return;
+        }
+
+        User* prev = following;
+        User* curr = following->next;
+
+        while (curr != nullptr) {
+            if (curr->username == usernameToUnfollow) {
+                prev->next = curr->next;
+                curr->followers--;
+                curr->next = nullptr;
+                return;
+            }
+            prev = curr;
+            curr = curr->next;
+        }
+
+        cout << "User '" << usernameToUnfollow << "' not found in your following list." << endl;
+    }
+
+    int countRepositories() {
+        int count = 0;
+        Repository* temp = repositories;
+        while (temp != nullptr) {
+            count++;
+            temp = temp->next;
+        }
+        return count;
+    }
+
+    int countFiles() {
+        int count = 0;
+        Repository* tempRepo = repositories;
+        while (tempRepo != nullptr) {
+            File* tempFile = tempRepo->files;
+            while (tempFile != nullptr) {
+                count++;
+                tempFile = tempFile->next;
+            }
+            tempRepo = tempRepo->next;
+        }
+        return count;
+    }
+
+    int countComments() {
+        int count = 0;
+        Repository* tempRepo = repositories;
+        while (tempRepo != nullptr) {
+            Comment* tempComment = tempRepo->comments;
+            while (tempComment != nullptr) {
+                count++;
+                tempComment = tempComment->next;
+            }
+            tempRepo = tempRepo->next;
+        }
+        return count;
+    }
+
+    void deleteRepository(const string& repoName) {
+        Repository* prevRepo = nullptr;
+        Repository* currRepo = repositories;
+
+        // Search for the repository
+        while (currRepo != nullptr && currRepo->name != repoName) {
+            prevRepo = currRepo;
+            currRepo = currRepo->next;
+        }
+
+        // If repository found, delete it
+        if (currRepo != nullptr) {
+            if (prevRepo != nullptr) {
+                prevRepo->next = currRepo->next;
+            }
+            else {
+                repositories = currRepo->next;
+            }
+            delete currRepo;
+            cout << "Repository '" << repoName << "' deleted successfully!\n";
+        }
+        else {
+            cout << "Repository not found.\n";
+        }
+    }
+void saveDataToFile(const string& filename) {
+        ofstream outfile(filename);
+        if (!outfile.is_open()) {
+            cout << "Error: Unable to open file for writing.\n";
+            return;
+        }
+        outfile << username << "," << password << "," << followers << "," << countRepositories() << "\n";
+        Repository* tempRepo = repositories;
+        while (tempRepo != nullptr) {
+            outfile << tempRepo->name << "," << tempRepo->visibility << "\n";
+            File* tempFile = tempRepo->files;
+            while (tempFile != nullptr) {
+                outfile << "FILE," << tempFile->name << "," << tempFile->commits->fileData << "\n"; // Write only the latest commit data
+                tempFile = tempFile->next;
+            }
+            Comment* tempComment = tempRepo->comments;
+            while (tempComment != nullptr) {
+                outfile << "COMMENT," << tempComment->comment << "\n";
+                tempComment = tempComment->next;
+            }
+            outfile << "EOF\n"; // Mark the end of repository data
+            tempRepo = tempRepo->next;
+        }
+        outfile.close();
+    }
+
+    void loadDataFromFile(const string& filename) {
+        ifstream infile(filename);
+        if (!infile.is_open()) {
+            cout << "Error: Unable to open file for reading.\n";
+            return;
+        }
+        string line;
+        while (getline(infile, line)) {
+            istringstream iss(line);
+            string token;
+            getline(iss, token, ',');
+            if (token.empty()) // Empty line, skip
+                continue;
+            username = token;
+            getline(iss, password, ',');
+            getline(iss, token, ',');
+            followers = stoi(token);
+            getline(iss, token, ',');
+            int numRepos = stoi(token);
+            for (int i = 0; i < numRepos; ++i) {
+                string repoName, visibilityStr;
+                bool visibility;
+                getline(infile, line);
+                istringstream issRepo(line);
+                getline(issRepo, repoName, ',');
+                getline(issRepo, visibilityStr, ',');
+                visibility = (visibilityStr == "1" ? true : false);
+                addRepository(repoName, visibility);
+                Repository* repo = findRepository(repoName);
+                if (repo) {
+                    while (true) {
+                        getline(infile, line);
+                        istringstream issData(line);
+                        getline(issData, token, ',');
+                        if (token == "EOF") // Check for end of repository data
+                            break;
+                        if (token == "FILE") {
+                            string fileName, fileData;
+                            getline(issData, fileName, ',');
+                            getline(issData, fileData, ',');
+                            repo->addFile(fileName, fileData);
+                        }
+                        else if (token == "COMMENT") {
+                            string commentText;
+                            getline(issData, commentText, ',');
+                            repo->addComment(commentText);
+                        }
+                    }
+                }
+            }
+        }
+        infile.close();
+    }
+
+    void displayAccountDetails() {
+        cout << "\t\t\t'" << username << "' Account Details " << endl;
+        cout << "\t\tFollowers: " << followers << endl;
+        cout << "\t\tRepositories: " << countRepositories() << endl;
+        cout << "\t\tFiles: " << countFiles() << endl;
+        cout << "\t\tComments: " << countComments() << endl;
+    }
+};
+
+void registerUser(const string& username, const string& password) {
+    ofstream outfile("users.csv", ios::app);
+    outfile << username << "," << password << ",0,0\n";
+    outfile.close();
+    cout << "User registered successfully!\n";
+}
+
+bool loginUser(const string& username, const string& password, User& user) {
+    ifstream infile("users.csv");
+    string storedUsername, storedPassword;
+    int followers, repositories;
+    while (getline(infile, storedUsername, ',')) {
+        getline(infile, storedPassword, ',');
+        infile >> followers;
+        infile.ignore();
+        infile >> repositories;
+        infile.ignore();
+        if (storedUsername == username && storedPassword == password) {
+            cout << "Login successful!\n";
+            user.username = username;
+            user.password = password;
+            user.followers = followers;
+            user.loadDataFromFile(username + ".csv");
+            infile.close();
+            return true;
+        }
+        // Skip the rest of the line
+       infile.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    cout << "Invalid username or password. Please try again.\n";
+    infile.close();
+    return false;
+}
+
+void addRepository(User& user) {
+    string repoName;
+    bool visib;
+    cout << "Enter repository name: ";
+    cin >> repoName;
+    cout << "Enter repository Visibility('0' for private & '1' for public): ";
+    cin >> visib;
+    user.addRepository(repoName, visib);
+    cout << "Repository added successfully!\n";
+}
+
+void addFileToRepository(User& user) {
+    string repoName, fileName, fileData;
+    cout << "Enter repository name: ";
+    cin >> repoName;
+    Repository* repo = user.findRepository(repoName);
+    if (repo != nullptr) {
+        cout << "Enter file name: ";
+        cin >> fileName;
+        cout << "Enter file data: ";
+        cin.ignore();
+        getline(cin, fileData);
+        repo->addFile(fileName, fileData);
+        cout << "File added to repository successfully!\n";
+    }
+    else {
+        cout << "Repository not found.\n";
+    }
+}
+
+void addCommentToFile(User& user) {
+    string repoName, fileName, commentText;
+    cout << "Enter repository name: ";
+    cin >> repoName;
+    Repository* repo = user.findRepository(repoName);
+    if (repo != nullptr) {
+        cout << "Enter file name: ";
+        cin >> fileName;
+        cout << "Enter comment: ";
+        cin.ignore();
+        getline(cin, commentText);
+        repo->addComment(commentText);
+        cout << "Comment added to file successfully!\n";
+    }
+    else {
+        cout << "Repository not found.\n";
+    }
+}
+
+void showRepositoryDetails(User& user) {
+    string repoName;
+    cout << "Enter repository name: ";
+    cin >> repoName;
+    Repository* repo = user.findRepository(repoName);
+    if (repo != nullptr) {
+        cout << "Repository Name: " << repo->name << endl;
+        cout << "Files:\n";
+        File* file = repo->files;
+        while (file != nullptr) {
+            cout << "File Name: " << file->name << endl;
+            cout << "Latest Commit Data: " << file->commits->fileData << endl; // Display latest commit data
+            file = file->next;
+        }
+        cout << "Comments:\n";
+        Comment* comment = repo->comments;
+        while (comment != nullptr) {
+            cout << "Comment: " << comment->comment << endl;
+            comment = comment->next;
+        }
+    }
+    else {
+        cout << "Repository not found.\n";
+    }
+}
+
+void showAllUserFiles(User& user) {
+    cout << "Files for User: " << user.username << endl;
+    Repository* tempRepo = user.repositories;
+    while (tempRepo != nullptr) {
+        cout << "Repository: " << tempRepo->name << endl;
+        File* tempFile = tempRepo->files;
+        while (tempFile != nullptr) {
+            cout << "File Name: " << tempFile->name << endl;
+            tempFile = tempFile->next;
+        }
+        tempRepo = tempRepo->next;
+    }
+}
+
+void displayAccountDetails(User& user) {
+    user.displayAccountDetails();
+}
+
+void forkRepository(User& user, User& owner, const string& repoName) {
+    Repository* repoToCopy = owner.findRepository(repoName);
+    if (repoToCopy == nullptr) {
+        cout << "Repository not found.\n";
+        return;
+    }
+
+    // Create a new repository for the current user
+    user.addRepository(repoName, repoToCopy->visibility);
+    Repository* newRepo = user.findRepository(repoName);
+
+    // Copy files from the original repository
+    File* fileToCopy = repoToCopy->files;
+    while (fileToCopy != nullptr) {
+        newRepo->addFile(fileToCopy->name, fileToCopy->commits->fileData); // Copy latest commit data
+        fileToCopy = fileToCopy->next;
+    }
+
+    // Copy comments from the original repository
+    Comment* commentToCopy = repoToCopy->comments;
+    while (commentToCopy != nullptr) {
+        newRepo->addComment(commentToCopy->comment);
+        commentToCopy = commentToCopy->next;
+    }
+
+    cout << "Repository '" << repoName << "' forked successfully!\n";
+}
+// Function to commit a file in a repository
+void commitFile(User& user) {
+    string repoName, fileName, fileData;
+    cout << "Enter repository name: ";
+    cin >> repoName;
+    Repository* repo = user.findRepository(repoName);
+    if (repo != nullptr) {
+        cout << "Enter file name: ";
+        cin >> fileName;
+        cout << "Enter new file data: ";
+        cin.ignore();
+        getline(cin, fileData);
+        repo->commitFile(fileName, fileData);
+    }
+    else {
+        cout << "Repository not found.\n";
+    }
+}
+
+void followUser(User& user) {
+    string usernameToFollow;
+    cout << "Enter the username of the user you want to follow: ";
+    cin >> usernameToFollow;
+
+    ifstream infile("users.csv");
+    string storedUsername;
+    while (getline(infile, storedUsername, ',')) {
+        string storedPassword;
+        getline(infile, storedPassword, ','); // skip password
+        int followers, repositories;
+        infile >> followers >> repositories;
+        infile.ignore(); // consume '\n'
+
+        if (storedUsername == usernameToFollow) {
+            User* userToFollow = new User(storedUsername, storedPassword);
+            user.followUser(userToFollow);
+            cout << "You are now following user '" << usernameToFollow << "'.\n";
+            user.followers++;
+            infile.close();
+            return;
+        }
+
+        // Skip rest of the line
+       infile.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+
+    cout << "User '" << usernameToFollow << "' not found.\n";
+    infile.close();
+}
+
+void unfollowUser(User& user) {
+    string usernameToUnfollow;
+    cout << "Enter the username of the user you want to unfollow: ";
+    cin >> usernameToUnfollow;
+    user.unfollowUser(usernameToUnfollow);
+}
+void welcome()
+{
+    cout << "\n\n";
+    cout << "\t\t\t\t---------------------------------------" << endl;
+    cout << "\t\t\t\t| [Data Structure Lab Final Project] |                  " << endl << endl;
+
+    cout << "\t\t\t\t| [1. Adnan Ali and 2. Abdullah zain] |                  " << endl;
+    cout << "\t\t\t\t---------------------------------------" << endl << endl << endl;
+    cout << "\t======================== Truth Table============================" << endl;
+    cout << "\n\n";
+    cout << "\n\n";
+
+    cout << "\n\n";
+    cout << "\n\n";
+    cout << "\t\t\t\t *              *              *    *********  *             ********  ********  *                      *  ********   \n";
+    cout << "\t\t\t\t *            *  *             *    *          *             *         *      *  * *                  * *  *          \n";
+    cout << "\t\t\t\t *           *     *           *    *          *             *         *      *  *   *               *  *  *           \n";
+    cout << "\t\t\t\t *          *       *          *    *          *             *         *      *  *    *             *   *  *          \n";
+    cout << "\t\t\t\t *         *         *         *    *          *             *         *      *  *     *           *    *  *           \n";
+    cout << "\t\t\t\t *        *           *        *    *          *             *         *      *  *      *         *     *  *          \n";
+    cout << "\t\t\t\t *       *             *       *    *          *             *         *      *  *       *       *      *  *           \n";
+    cout << "\t\t\t\t *      *               *      *    *********  *             *         *      *  *        *     *       *  ********     \n";
+    cout << "\t\t\t\t *     *                 *     *    *          *             *         *      *  *         *   *        *  *           \n";
+    cout << "\t\t\t\t *    *                   *    *    *          *             *         *      *  *          * *         *  *           \n";
+    cout << "\t\t\t\t *   *                     *   *    *          *             *         *      *  *           *          *  *           \n";
+    cout << "\t\t\t\t *  *                       *  *    *          *             *         *      *  *                      *  *            \n";
+    cout << "\t\t\t\t * *                         * *    *          *             *         *      *  *                      *  *             \n";
+    cout << "\t\t\t\t *                             *    *********  *********      ********  ******** *                      *  *********     \n";
+
+
+    cout << "\n\n\n\n\t\t\t\t Loading";
+    for (int i = 0; i <= 8; i++)
+    {
+        cout << ".*.";
+        Sleep(1500);
+    }
+    system("cls");
+}
+void welcome1()
+{
+    cout << "\t\t\t\t---------------------------------------" << endl;
+    cout << "\t\t\t\t| [Data Structure Lab Final Project] |                  " << endl << endl;
+
+    cout << "\t\t\t\t| [1. Abdul Basit] |                  " << endl;
+
+    cout << "\t\t\t\t---------------------------------------" << endl << endl << endl;
+    cout << "\t======================== Truth Table============================" << endl;
+    Sleep(10);
+    system("cls");
+}
+
+
+
+
+int main() {
+    int choice;
+    string username, password;
+    welcome();
+    welcome1();
+    User owner("owner_username", "owner_password");
+
+    while (true) {
+        cout << "Welcome to the User Management System\n";
+        cout << "1. Register\n";
+        cout << "2. Login\n";
+        cout << "3. Exit\n";
+        cout << "Enter your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1:
+            cout << "Enter username: ";
+            cin >> username;
+            cout << "Enter password: ";
+            cin >> password;
+            registerUser(username, password);
+            break;
+        case 2:
+        {
+            cout << "Enter username: ";
+            cin >> username;
+            cout << "Enter password: ";
+            cin >> password;
+
+            if (loginUser(username, password, owner)) {
+                int userChoice;
+                do {
+                    owner.displayAccountDetails();
+                    cout << "1. Add Repository\n";
+                    cout << "2. Add File to Repository\n";
+                    cout << "3. Add Comment to File\n";
+                    cout << "4. Show Repository Details\n";
+                    cout << "5. Show All User Files\n";
+                    cout << "6. Delete Repository\n";
+                    cout << "7. Fork Repository\n";
+                    cout << "8. Commit File\n"; // New option for commit
+                    cout << "9. Follow User\n";
+                    cout << "10. Unfollow User\n";
+                    cout << "11. Logout\n";
+                    cout << "Enter your choice: ";
+                    cin >> userChoice;
+
+                    switch (userChoice) {
+                    case 1:
+                        addRepository(owner);
+                        break;
+                    case 2:
+                        addFileToRepository(owner);
+                        break;
+                    case 3:
+                        addCommentToFile(owner);
+                        break;
+                    case 4:
+                        showRepositoryDetails(owner);
+                        break;
+                    case 5:
+                        showAllUserFiles(owner);
+                        break;
+                    case 6:
+                    {
+                        string repoName;
+                        cout << "Enter the name of the repository you want to delete: ";
+                        cin >> repoName;
+                        owner.deleteRepository(repoName);
+                    }
+                    break;
+                    case 7:
+                    {
+                        string repoName;
+                        cout << "Enter the name of the repository you want to fork: ";
+                        cin >> repoName;
+                        forkRepository(owner, owner, repoName);
+                    }
+                    break;
+                    case 8:
+                        commitFile(owner);
+                        break;
+                    case 9:
+                        followUser(owner);
+                        //owner.followers++;
+                        break;
+                    case 10:
+                        unfollowUser(owner);
+                        cout << "\t\t\tYou have successfuly unfollowed the user\n";
+                        break;
+                    case 11:
+                        owner.saveDataToFile(owner.username + ".csv");
+                        cout << "Logged out successfully!\n";
+                        break;
+                    default:
+                        cout << "Invalid choice. Please try again.\n";
+                    }
+                } while (userChoice != 11);
+            }
+            break;
+        }
+        case 3:
+            return 0;
+        default:
+            cout << "Invalid choice. Please try again.\n";
+        }
+    }
+
+    return 0;
+}
+
